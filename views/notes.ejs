@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Notes | Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<!-- Maine body mein flex-col aur min-h-screen add kiya hai footer ko niche rakhne ke liye -->
+<body class="bg-slate-50 min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <nav class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16 items-center">
+        <div class="flex items-center">
+          <span class="text-2xl font-bold text-blue-600 tracking-tight">NoteFlow</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="/create-note" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all text-sm shadow-md shadow-blue-100">
+            +NewNote
+          </a>
+          <a href="/logout" class="text-slate-500 hover:text-red-600 font-medium text-sm transition-colors">
+            Logout
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content (flex-grow footer ko niche dhakelega) -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+    
+    <div class="flex items-center justify-between mb-8">
+      <h2 class="text-2xl font-bold text-slate-800">Your Notes</h2>
+      <span class="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">
+        <%= notes.length %> Notes
+      </span>
+    </div>
+
+    <!-- Empty State -->
+    <% if(notes.length === 0){ %>
+      <div class="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-200">
+        <div class="text-slate-400 text-5xl mb-4">📝</div>
+        <h3 class="text-lg font-semibold text-slate-700">No notes found</h3>
+        <p class="text-slate-500 mb-6">You haven’t created any notes yet.</p>
+        <a href="/create-note" class="text-blue-600 font-bold hover:underline">Create your first note. &rarr;</a>
+      </div>
+    <% } %>
+
+    <!-- Notes Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <% notes.forEach(note => { %>
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div>
+            <h3 class="text-lg font-bold text-slate-800 mb-2 break-words">
+              <%= note.title %>
+            </h3>
+            <p class="text-slate-600 text-sm leading-relaxed mb-6 break-words">
+              <%= note.content %>
+            </p>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-3 pt-4 border-t border-slate-50">
+            <form action="/edit/<%= note._id %>" method="get" class="flex-1">
+                <button class="w-full text-slate-600 bg-slate-100 hover:bg-slate-200 font-semibold py-2 rounded-lg text-xs transition-colors">
+                  Edit
+                </button>
+            </form>
+            <form action="/delete/<%= note._id %>" method="POST" class="flex-1">
+                <button onclick="return confirm('are you sure to delete your note?')" 
+                  class="w-full text-red-600 bg-red-50 hover:bg-red-100 font-semibold py-2 rounded-lg text-xs transition-colors">
+                  Delete
+                </button>
+            </form>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </main>
+
+  <!-- PROFESSIONAL FOOTER -->
+  <footer class="bg-white border-t border-slate-200 py-10 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        
+        <!-- Branding/Copyright -->
+        <div class="text-slate-500 text-sm text-center md:text-left">
+          <p class="font-bold text-slate-800 text-base mb-1">StickyNotes</p>
+          <p>&copy; 2024 All rights reserved.</p>
+        </div>
+
+        <!-- Social Icons -->
+        <div class="flex items-center gap-6">
+          <!-- WhatsApp -->
+          <a href="https://wa.me/yournumber" class="text-slate-400 hover:text-green-500 transition-all transform hover:scale-110">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-4.821 7.454c-1.88 0-3.724-.504-5.333-1.458L4 21.25l1.031-3.765c-1.047-1.706-1.603-3.667-1.603-5.69 0-5.93 4.826-10.755 10.758-10.755 2.876 0 5.58 1.12 7.614 3.155 2.035 2.035 3.155 4.74 3.155 7.616 0 5.933-4.827 10.759-10.759 10.759"/></svg>
+          </a>
+          <!-- Instagram -->
+          <a href="#" class="text-slate-400 hover:text-pink-600 transition-all transform hover:scale-110">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.266.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          </a>
+          <!-- Facebook -->
+          <a href="#" class="text-slate-400 hover:text-blue-700 transition-all transform hover:scale-110">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-8.74h-2.94v-3.411h2.94v-2.517c0-2.915 1.78-4.502 4.379-4.502 1.244 0 2.315.093 2.626.135v3.044h-1.802c-1.414 0-1.688.672-1.688 1.658v2.172h3.366l-.438 3.411h-2.928v8.741h6.104c.73 0 1.325-.593 1.325-1.325v-21.351c0-.732-.593-1.325-1.325-1.325z"/></svg>
+          </a>
+          <!-- Twitter/X -->
+          <a href="#" class="text-slate-400 hover:text-slate-900 transition-all transform hover:scale-110">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+        </div>
+
+        <!-- Credit Section -->
+        <div class="text-slate-700 font-medium text-sm tracking-wide bg-slate-100 px-4 py-2 rounded-full border border-slate-200">
+          Created by <span class="text-blue-600 font-bold">G-ONE</span>
+        </div>
+
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

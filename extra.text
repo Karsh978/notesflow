@@ -1,0 +1,331 @@
+const express = require('express');
+const nodemailer = require('nodemailer')
+require('dotenv').config();
+const app = express();
+const path = require('path');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
+ app.use(cookieParser());
+const userModel = require('./models/user');
+const noteModel = require('./models/note');
+
+app.set('view engine','ejs');
+
+app.use(express.static(path.join(__dirname,'public')));
+app.use(express.urlencoded({extended:true}));
+app.use(express.json());
+
+//otp verification 
+const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465, // Ya 587
+    secure: true, // true for 465, false for 587
+    auth: {
+        user: process.env.GMAIL_USER, 
+        pass: process.env.GMAIL_PASS   
+    },
+   
+    tls: {
+        rejectUnauthorized: false
+    }
+});
+/* REGISTER - SEND OTP */
+app.post('/register', async (req, res) => {
+    let { firstName, lastName, email, password } = req.body;
+
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password, salt);
+
+    // 6 digit random OTP generate karein
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // User create karein (lekin isVerified: false rahega)
+    await userModel.create({
+        firstName, lastName, email,
+        password: hash,
+        otp: generatedOtp,
+        otpExpires: Date.now() + 10 * 60 * 1000 // 10 minutes expiry
+    });
+
+    // Email bhejein
+    const mailOptions = {
+        from: 'apka-email@gmail.com',
+        to: email,
+        subject: 'Your Verification Code',
+        text: `Your OTP is ${generatedOtp}. It will expire in 10 minutes.`
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            console.log(error);
+            return res.send("Email sending failed");
+        }
+        // OTP page par bhej dein aur email query string mein pass karein
+        res.render('verify-otp', { email });
+    });
+});
+
+app.post('/verify-otp', async (req, res) => {
+    const { email, otp } = req.body;
+
+    const user = await userModel.findOne({ email });
+
+    if (!user) return res.send("User not found");
+
+    // Check if OTP matches and is not expired
+    if (user.otp === otp && user.otpExpires > Date.now()) {
+        user.isVerified = true;
+        user.otp = null; // Use hone ke baad delete kar dein
+        user.otpExpires = null;
+        await user.save();
+
+        res.redirect('/login');
+    } else {
+        res.send("Invalid or Expired OTP");
+    }
+});
+
+//resend otp 
+app.post('/resend-otp', async (req, res) => {
+    const { email } = req.body;
+    const user = await userModel.findOne({ email });
+
+    if (!user) return res.send("User not found");
+
+    // Naya OTP generate karein
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = newOtp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    // Email bhejein
+    await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: email,
+        subject: 'Your New Verification Code',
+        text: `Your new OTP is ${newOtp}`
+    });
+
+    res.render('verify-otp', { email, message: "OTP sent again!" });
+});
+/* HOME */
+
+app.get('/',(req,res)=>{
+    res.redirect('/login');
+});
+
+/* REGISTER */
+
+app.get('/register',(req,res)=>{
+    res.render('register');
+});
+
+app.post('/register', async(req,res)=>{
+
+    let {firstName,lastName,email,password} = req.body;
+
+    const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if(!passwordRegex.test(password)){
+      return res.send(
+        'Password must be 8 characters and include uppercase, lowercase, number and special character'
+      );
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password,salt);
+
+    await userModel.create({
+        firstName,
+        lastName,
+        email,
+        password:hash
+    });
+
+    res.redirect('/login');
+    // Register route ke andar jab email bhej dein:
+res.render('verify-otp', { email: email });
+});
+
+/* LOGIN */
+
+app.get('/login',(req,res)=>{
+    res.render('login');
+});
+
+app.post('/login', async (req,res)=>{
+   let {email,password} = req.body;
+   let user = await userModel.findOne({email});
+
+   if(!user) return res.send("User not found");
+      if (!user.isVerified) {
+        return res.send("Please verify your email first.");
+    }
+
+   const result = await bcrypt.compare(password,user.password);
+
+   if(result){
+      // ✅ FIX: Put the user._id in the token, not just the email
+      const token = jwt.sign({ email: user.email, userid: user._id }, 'secretkey');
+
+      res.cookie('token', token, { httpOnly: true, path: '/' });
+      res.redirect('/notes');
+   } else {
+      res.send("Wrong password");
+   }
+});
+/* MIDDLEWARE */
+
+function isLoggedIn(req, res, next) {
+    const token = req.cookies.token;
+
+    if (!token) {
+        console.log("No token found in cookies");
+        return res.redirect('/login');
+    }
+
+    try {
+        const data = jwt.verify(token, 'secretkey');
+        req.user = data;
+        next();
+    } catch (err) {
+        console.log("JWT Verification Failed:", err.message);
+        res.clearCookie('token'); // Clear corrupted/expired token
+        res.redirect('/login');
+    }
+}
+
+/* LOGOUT */
+
+app.get('/logout',(req,res)=>{
+    res.clearCookie('token');
+    res.redirect('/login');
+});
+
+/* CREATE NOTE PAGE */
+
+app.get('/create-note',isLoggedIn,(req,res)=>{
+ res.render('create-note')
+});
+
+/* CREATE NOTE */
+
+app.post('/create-note', isLoggedIn, async (req, res) => {
+    const { title, content } = req.body;
+
+    await noteModel.create({
+        title,
+        content,
+        user: req.user.userid // Use the ID from the token
+    });
+
+    res.redirect('/notes');
+});
+
+/*  delete notes */
+app.post('/delete/:id', isLoggedIn, async (req,res)=>{
+   await noteModel.findByIdAndDelete(req.params.id);
+   res.redirect('/notes');
+});
+
+/*  edit notes */
+/* EDIT NOTE PAGE */
+
+app.post('/edit-note/:id',isLoggedIn,async(req,res)=>{
+ const note = await noteModel.findByIdAndUpdate(req.params.id);
+  res.render('edit-note',{note});
+})
+
+/*  update route for edit pages  */
+/* UPDATE NOTE LOGIC */
+app.post('/update/:id', isLoggedIn, async (req, res) => {
+    try {
+        const { title, content } = req.body;
+
+        await noteModel.findOneAndUpdate(
+            { _id: req.params.id, user: req.user.userid }, // Kis note ko update karna hai
+            { title, content },                            // Kya update karna hai
+            { new: true }
+        );
+
+        res.redirect('/notes'); // Update hone ke baad wapas dashboard par
+    } catch (err) {
+        console.log(err);
+        res.send("Error updating note");
+    }
+});
+
+/* SHOW NOTES */
+app.get('/notes', isLoggedIn, async (req,res)=>{
+   try {
+      // ✅ Search by the ID, not the email string
+      const notes = await noteModel.find({
+         user: req.user.userid 
+      });
+
+      res.render('notes', {notes});
+   } catch (err) {
+      console.log(err);
+      res.send("Error fetching notes");
+   }
+});
+app.post('/create-note', isLoggedIn, async (req, res) => {
+    const { title, content } = req.body;
+
+    await noteModel.create({
+        title,
+        content,
+        user: req.user.userid // Use the ID from the token
+    });
+
+    res.redirect('/notes');
+});
+
+/* forgot password */app.get('/forgot-password', (req, res) => {
+    res.render('forgot-password');
+});
+
+app.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    const user = await userModel.findOne({ email });
+
+    if (!user) return res.send("User with this email does not exist.");
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: email,
+        subject: 'Password Reset OTP',
+        text: `Your OTP to reset password is ${otp}`
+    });
+
+    res.render('reset-password', { email }); // Naya page banayenge
+});
+ // update password
+app.post('/reset', async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+    const user = await userModel.findOne({ email });
+
+    if (user.otp === otp && user.otpExpires > Date.now()) {
+        // Password hash karein
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(newPassword, salt);
+
+        user.password = hash;
+        user.otp = null;
+        user.otpExpires = null;
+        await user.save();
+
+        res.send("Password reset successful! You can now login.");
+    } else {
+        res.send("Invalid or Expired OTP.");
+    }
+});
+app.listen(3000,()=>{
+    console.log("Server running on port 3000");
+});
