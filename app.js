@@ -10,6 +10,9 @@ const userModel = require('./models/user');
 const noteModel = require('./models/note');
 
 const app = express();
+mongoose.connect(process.env.MONGO_URI)
+.then(()=> console.log("MongoDB Connected"))
+.catch(err => console.log(err));
 
 // --- MIDDLEWARES ---
 app.set('view engine', 'ejs');
