@@ -1,5 +1,6 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
+const mongoose = require('mongoose');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
