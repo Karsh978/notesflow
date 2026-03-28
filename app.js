@@ -1,12 +1,15 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const session = require("express-session");
 const mongoose = require('mongoose');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
-const passport = require("passport");
+
 
 const userModel = require('./models/user');
 const noteModel = require('./models/note');
@@ -25,17 +28,54 @@ app.use(express.json());
 app.use(cookieParser());
 
 //---google signup option ---//
-app.get(
-"/auth/google",
+app.get("/auth/google",
 passport.authenticate("google", { scope: ["profile", "email"] })
 );
-app.get(
-"/auth/google/callback",
+
+app.get("/auth/google/callback",
 passport.authenticate("google", { failureRedirect: "/login" }),
 (req, res) => {
-res.redirect("/notes");
+  res.redirect("/notes");
+});
+
+app.use(session({
+  secret: "notesappsecret",
+  resave: false,
+  saveUninitialized: true
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "/auth/google/callback"
+},
+async (accessToken, refreshToken, profile, done) => {
+
+  const email = profile.emails[0].value;
+
+  let user = await User.findOne({ email });
+
+  if (!user) {
+    user = new User({
+      email: email,
+      name: profile.displayName
+    });
+    await user.save();
+  }
+
+  return done(null, user);
 }
-);
+));
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  const user = await User.findById(id);
+  done(null, user);
+});
 
 // --- NODEMAILER CONFIG ---
 const transporter = nodemailer.createTransport({
