@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
+const passport = require("passport");
 
 const userModel = require('./models/user');
 const noteModel = require('./models/note');
@@ -22,6 +23,19 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
+
+//---google signup option ---//
+app.get(
+"/auth/google",
+passport.authenticate("google", { scope: ["profile", "email"] })
+);
+app.get(
+"/auth/google/callback",
+passport.authenticate("google", { failureRedirect: "/login" }),
+(req, res) => {
+res.redirect("/notes");
+}
+);
 
 // --- NODEMAILER CONFIG ---
 const transporter = nodemailer.createTransport({
