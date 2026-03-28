@@ -2,6 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const GitHubStrategy = require("passport-github2").Strategy;
 const session = require("express-session");
 const mongoose = require('mongoose');
 const path = require('path');
@@ -76,6 +77,43 @@ passport.deserializeUser(async (id, done) => {
   const user = await User.findById(id);
   done(null, user);
 });
+
+
+
+//--- login with github--//
+passport.use(new GitHubStrategy({
+  clientID: process.env.GITHUB_CLIENT_ID,
+  clientSecret: process.env.GITHUB_CLIENT_SECRET,
+  callbackURL: "https://notesapp-two-olive.vercel.app/auth/github/callback"
+},
+async function(accessToken, refreshToken, profile, done) {
+
+  let user = await User.findOne({ githubId: profile.id });
+
+  if (!user) {
+    user = await User.create({
+      githubId: profile.id,
+      name: profile.displayName || profile.username,
+      email: profile.emails?.[0]?.value
+    });
+  }
+
+  return done(null, user);
+}
+));
+
+app.get("/auth/github",
+  passport.authenticate("github", { scope: ["user:email"] })
+);
+
+app.get("/auth/github/callback",
+  passport.authenticate("github", {
+    failureRedirect: "/login"
+  }),
+  function(req, res) {
+    res.redirect("/dashboard");
+  }
+);
 
 // --- NODEMAILER CONFIG ---
 const transporter = nodemailer.createTransport({
